@@ -1,4 +1,4 @@
-﻿/* ============================================================
+/* ============================================================
    1️  Autoři z článků, kde instituce sídlí v Ostravě
    ============================================================ */
 SELECT DISTINCT aut.rid, aut.name
@@ -198,7 +198,7 @@ WHERE ca.pocet = ma.maximum;
    🔟  Obory s časopisy bez článků (pocetClanku = 0)
    ============================================================ */
 WITH counts_articles AS (
-    SELECT ff.name AS field, jo.name AS jmenoClanku, COUNT(ar.aid) AS pocetClanku
+    SELECT ff.name AS field, jo.name AS jmenoCasopisu, COUNT(ar.aid) AS pocetClanku
     FROM z_field_ford ff
         JOIN z_field_of_science fos ON fos.sid = ff.sid
         JOIN z_year_field_journal yfj ON yfj.fid = ff.fid
@@ -208,7 +208,7 @@ WITH counts_articles AS (
       AND fos.name LIKE 'Engineering and Technology'
     GROUP BY ff.name, jo.name
 )
-SELECT field AS ford, COUNT(jmenoClanku) AS pocet2, pocetClanku
+SELECT field AS obor, COUNT(jmenoCasopisu) AS pocetCasopisuBezClanku, pocetClanku
 FROM counts_articles
 WHERE pocetClanku = 0
 GROUP BY field, pocetClanku;
@@ -342,3 +342,401 @@ WHERE pocet = (
     SELECT MAX(pocet)
     FROM SpravnniAutoriPoctyClanku
 );
+
+-- =====================================================================
+-- Pro každý obor FORD z vědního oboru 'Engineering and Technology'
+-- vypište jméno článku, publikovaném v daném oboru v Q1 časopisu
+-- v letech 2018–2019 a který má nejvíce autorů.
+-- Vypište jméno oboru, jméno článku a počet autorů.
+-- Setřiďte podle názvu oboru a jména článku.
+-- =====================================================================
+WITH fordPocetAUtoru as
+(
+                        SELECT ff.name AS obor, ar.name AS clanek, COUNT(aaut.rid) as pocetAutoru --9856 radku
+                        FROM z_article ar JOIN z_journal jou on ar.jid=jou.jid
+                        JOIN z_year_field_journal yfj on yfj.jid=ar.jid AND yfj.year=ar.year
+                        JOIN z_field_ford ff on ff.fid=yfj.fid
+                        JOIN z_field_of_science fos on fos.sid=ff.sid
+                        JOIN z_article_author aaut on aaut.aid=ar.aid
+                            WHERE yfj.ranking LIKE 'Q1'
+                            AND yfj.year IN (2018,2019)
+                            AND fos.name LIKE 'Engineering and technology'
+                            GROUP BY ff.name, ar.name
+), maxPocetAutoru as 
+(
+                        SELECT  obor,MAX(pocetAutoru) AS maximalniPocetAutoru
+                        FROM fordPocetAUtoru fpa
+                        GROUP BY obor
+)
+SELECT distinct fpa.* 
+FROM fordPocetAUtoru fpa JOIN maxPocetAutoru mpa ON mpa.maximalniPocetAutoru=fpa.pocetAutoru 
+                                                    AND mpa.obor=fpa.obor
+
+-- =====================================================================
+-- Vypište, jaký byl rozdíl v počtu publikací v 'Decil' časopisech
+-- mezi lety 2019 a 2020 v jednotlivých oborech FORD
+-- z vědního oboru 'Engineering and Technology'.
+-- Pro každý obor vypište FID, název oboru FORD,
+-- počet publikací v roce 2019, počet publikací v roce 2020
+-- a rozdíl mezi těmito dvěma hodnotami.
+-- =====================================================================
+
+WITH oboryPoctyClankuVLetech as 
+(
+                                SELECT ff.fid AS idOboru,ff.name AS obor,
+                                SUM(CASE WHEN ar.year = 2019 THEN 1 ELSE 0 END) AS clanky_2019,
+                                SUM(CASE WHEN ar.year = 2020 THEN 1 ELSE 0 END) AS clanky_2020
+                                FROM z_article ar JOIN z_journal jou ON jou.jid=ar.jid
+                                JOIN z_year_field_journal yfj ON yfj.jid=jou.jid AND ar.year=yfj.year
+                                JOIN z_field_ford ff ON ff.fid=yfj.fid
+                                JOIN z_field_of_science fos ON fos.sid=ff.sid
+                                    WHERE ar.year in (2019,2020)
+                                    AND yfj.ranking like 'Decil'
+                                    AND fos.name like 'Engineering and Technology'
+                                    GROUP BY ff.fid,ff.name 
+)
+SELECT *,clanky_2019-clanky_2020
+FROM oboryPoctyClankuVLetech;
+
+
+-- =====================================================================
+-- Nalezněte obory FORD, kde v roce 2020 nikdy nebylo
+-- na žádné publikaci více než 20 autorů.
+-- =====================================================================
+WITH oboryPocty AS (
+    SELECT ff.name AS obor, ar.aid AS clanek, COUNT(DISTINCT aaut.rid) AS pocetAutoru
+    FROM z_article ar
+    JOIN z_journal jou ON jou.jid = ar.jid
+    JOIN z_year_field_journal yfj ON yfj.jid = jou.jid AND yfj.year = ar.year
+    JOIN z_field_ford ff ON ff.fid = yfj.fid
+    JOIN z_article_author aaut ON aaut.aid = ar.aid
+    WHERE ar.year = 2020
+    GROUP BY ff.name, ar.aid
+)
+SELECT obor, MAX(pocetAutoru) AS maxAutoru
+FROM oboryPocty
+GROUP BY obor
+    HAVING MAX(pocetAutoru) <= 20;
+
+
+-- =====================================================================
+-- Pro každý obor FORD z vědního oboru 'Social Sciences'
+-- vypište jméno článku, publikovaném v daném oboru
+-- v 'Decil' časopisu v letech 2019–2020 a který má nejvíce autorů.
+-- Vypište jméno oboru, jméno článku a počet autorů.
+-- Setřiďte podle názvu oboru a jména článku.
+-- =====================================================================
+WITH clankyPoctyAutoru AS
+(
+        SELECT ff.name AS obor,ar.name clanek, COUNT(aaut.rid) AS pocetAutoru
+        FROM z_article ar JOIN z_journal jou ON jou.jid=ar.jid
+        JOIN z_year_field_journal yfj ON yfj.jid=jou.jid AND yfj.year=ar.year
+        JOIN z_field_ford ff ON ff.fid=yfj.fid
+        JOIN z_field_of_science fos ON fos.sid=ff.sid
+        JOIN z_article_author aaut ON aaut.aid=ar.aid
+            WHERE fos.name like 'Social Sciences'
+            AND ar.year in (2019,2020)
+            AND yfj.ranking LIKE 'Decil'
+            GROUP BY ff.name,ar.name
+), maximalniPocetAutoru AS
+(
+        SELECT obor, MAX(pocetAutoru) AS maxAutoru
+        FROM clankyPoctyAutoru
+            GROUP BY obor
+)
+SELECT cpa.* 
+FROM maximalniPocetAutoru mpa JOIN clankyPoctyAutoru cpa ON cpa.obor=mpa.obor 
+                                                        AND  mpa.maxAutoru=cpa.pocetAutoru
+    ORDER BY obor,cpa.clanek
+
+
+-- =====================================================================
+-- Vypište, jaký byl rozdíl v počtu publikací v 'Q1' časopisech
+-- mezi lety 2019 a 2020 v jednotlivých oborech FORD
+-- z vědního oboru 'Social Sciences'.
+-- Pro každý obor vypište FID, název oboru FORD,
+-- počet publikací v roce 2019, počet publikací v roce 2020
+-- a rozdíl mezi těmito dvěma hodnotami.
+-- =====================================================================
+WITH obory2019 AS(
+SELECT ff.name obor, COUNT(distinct ar.aid) AS clanky_2019
+FROM z_article ar JOIN z_journal jou ON jou.jid=ar.jid
+JOIN z_year_field_journal yfj ON yfj.jid=jou.jid AND ar.year=yfj.year
+JOIN z_field_ford ff ON ff.fid=yfj.fid
+JOIN z_field_of_science fos ON fos.sid=ff.sid
+    WHERE yfj.ranking like 'Q1'
+    AND ar.year = 2019
+    AND fos.name LIKE 'Social Sciences'
+    GROUP BY ff.name
+),
+obory2020 AS(
+SELECT ff.name obor, COUNT(distinct ar.aid) AS clanky_2020
+FROM z_article ar JOIN z_journal jou ON jou.jid=ar.jid
+JOIN z_year_field_journal yfj ON yfj.jid=jou.jid AND ar.year=yfj.year
+JOIN z_field_ford ff ON ff.fid=yfj.fid
+JOIN z_field_of_science fos ON fos.sid=ff.sid
+    WHERE yfj.ranking like 'Q1'
+    AND ar.year = 2020
+    AND fos.name LIKE 'Social Sciences'
+    GROUP BY ff.name
+)
+SELECT o20.obor AS obor, COALESCE(o19.clanky_2019, 0) AS pocet2019, o20.clanky_2020 AS pocet20,
+COALESCE(o19.clanky_2019, 0)-o20.clanky_2020 AS rozdil
+FROM obory2019 o19 RIGHT JOIN obory2020 o20 ON o19.obor=o20.obor
+
+
+
+-- =====================================================================
+-- Nalezněte obory FORD, kde v roce 2019 nikdy nebylo
+-- na žádné publikaci více než 10 autorů.
+-- =====================================================================
+WITH oboryClankyPoctyAutoru as
+(
+                SELECT ff.name obor,ar.name clanek,COUNT(aaut.rid) pocetAutoru
+                FROM z_field_ford ff LEFT JOIN z_year_field_journal yfj ON yfj.fid=ff.fid
+                LEFT JOIN z_journal jou ON jou.jid=yfj.jid AND yfj.year =2019
+                LEFT JOIN z_article ar ON ar.jid=jou.jid AND ar.year=2019
+                LEFT JOIN z_article_author aaut ON aaut.aid=ar.aid
+                        GROUP BY  ff.name,ar.name
+)SELECT obor
+FROM oboryClankyPoctyAutoru
+    GROUP BY obor
+    HAVING MAX(pocetAutoru)<=10
+-- =====================================================================
+-- Pro každou instituci z Brna vypište články s největším počtem autorů
+-- Seradit podle clanku
+-- =====================================================================
+
+with clankyInstituciZBrnaAPoctyAutoru as
+(
+                        SELECT i.name AS instituce,ar.name AS clanek, COUNT(DISTINCT aaut.rid) as pocetAutoru
+                        FROM z_institution i join z_article_institution ai ON ai.iid=i.iid AND i.town like '%Brno%'
+                        JOIN z_article ar on ar.aid=ai.aid 
+                        JOIN z_article_author aaut on aaut.aid=ar.aid
+                        GROUP BY i.name,ar.name      
+), maximalniPocty as (
+SELECT instituce, MAX(pocetAutoru) AS maxPocet
+FROM clankyInstituciZBrnaAPoctyAutoru
+GROUP BY instituce
+)
+SELECT cia.*
+FROM maximalniPocty map join clankyInstituciZBrnaAPoctyAutoru cia ON map.maxPocet=cia.pocetAutoru 
+                                                                AND map.instituce=cia.instituce
+            ORDER BY cia.clanek
+
+
+-- =====================================================================
+-- Nalezněte časopisy ve ktrých v roce 2018 publikovala "Vysoká škola báňská - Technická univerzita Ostrava"
+-- více než "Vysoké učení technické v Brně". setřidit podle časopisu
+-- =====================================================================
+WITH casopisyPoctyClankuBanska AS
+(
+                        SELECT jou.name AS casopis , COUNT(DISTINCT ar.aid) AS pocetClanku
+                        FROM z_institution i join z_article_institution ai ON ai.iid=i.iid 
+                        JOIN z_article ar on ar.aid=ai.aid 
+                        JOIN z_journal jou ON jou.jid=ar.jid
+                        WHERE i.name like 'Vysoká škola báňská - Technická univerzita Ostrava'
+                            GROUP BY jou.name          
+) ,casopisyPoctyClankuBrno AS
+(
+                        SELECT jou.name AS casopis , COUNT(DISTINCT ar.aid) AS pocetClanku
+                        FROM z_institution i join z_article_institution ai ON ai.iid=i.iid 
+                        JOIN z_article ar on ar.aid=ai.aid 
+                        JOIN z_journal jou ON jou.jid=ar.jid
+                        WHERE i.name like 'Vysoké učení technické v Brně'
+                            GROUP BY jou.name          
+)
+SELECT banska.casopis,banska.pocetClanku,COALESCE(brno.pocetClanku,0)
+FROM casopisyPoctyClankuBanska banska LEFT JOIN casopisyPoctyClankuBrno brno ON banska.casopis=brno.casopis
+    WHERE banska.pocetClanku>COALESCE(brno.pocetClanku,0)
+    ORDER BY banska.casopis
+
+-- =====================================================================
+-- Vypište autory začínající na "falt", kteří v roce 2018 nikdy nepublikovali na článku s méně než sto
+-- autory. Vynechejte autory, kteří v roce 2018 nepublikovali vůbec. setřiďte podle jmena autora
+-- =====================================================================
+WITH pocty AS (
+  SELECT ar.aid, COUNT(DISTINCT aaut.rid) AS pocet_autoru
+  FROM z_article ar
+  JOIN z_article_author aaut ON aaut.aid = ar.aid
+  WHERE ar.year = 2018
+  GROUP BY ar.aid
+),
+falt AS (
+  SELECT aut.name AS autor, ar.aid
+  FROM z_author aut
+  JOIN z_article_author aaut ON aut.rid = aaut.rid
+  JOIN z_article ar ON ar.aid = aaut.aid
+  WHERE aut.name LIKE 'falt%' AND ar.year = 2018
+)
+SELECT f.autor,MIN(p.pocet_autoru)
+FROM falt f
+JOIN pocty p ON f.aid = p.aid
+GROUP BY f.autor
+HAVING MIN(p.pocet_autoru) >= 100
+ORDER BY f.autor;
+
+-- =====================================================================
+-- Pro každý obor FORD z vědního oboru "Engigeering and technology" vypište jméno článku, publikovaném v daném
+-- oboru v Q1 časopisu v letech 2018-2019 a který má nejvíce autorů. vypište jméno oboru, jméno článku a počet
+-- autorů. Setřiďte podle názvu oboru a jménu článku
+-- =====================================================================
+with oboryClankyPoctyAutoru as 
+(
+    SELECT DISTINCT ff.name AS obor, ff.fid oborID,ar.name clanek, COUNT(DISTINCT aaut.rid) pocetAutoru
+    FROM z_field_ford ff join z_field_of_science fos ON fos.sid=ff.sid
+    JOIN z_year_field_journal yfj on yfj.fid=ff.fid
+    JOIN z_journal jou ON jou.jid=yfj.jid
+    JOIN z_article ar on ar.jid=yfj.jid AND yfj.year =ar.year
+    JOIN z_article_author aaut on aaut.aid=ar.aid
+        WHERE fos.name like 'Engineering and Technology' 
+        AND yfj.year in (2019,2018)
+        AND yfj.ranking like 'Q1'
+            GROUP BY ff.name, ff.fid,ar.name
+), maximalni as(
+SELECT obor,MAX(pocetAutoru) maxpoc
+FROM oboryClankyPoctyAutoru tab 
+GROUP BY obor
+)
+SELECT ocpa.*
+FROM oboryClankyPoctyAutoru ocpa join maximalni ma on ma.obor=ocpa.obor AND ma.maxpoc=ocpa.pocetAutoru
+
+
+-- =====================================================================
+-- Vypište jaký byl rozdíl v počtu publikací v Decil časopisech mezi lety 2019 a 2020 v jednotlivych oborech
+-- FORD z vědního oboru 'Engineering and Technology'. Pro každý obor vypište FID, název oboru FORD, počet
+-- publikací v roce 2019, počet publikací v roce 2020 a rozdíl mezi těmito dvěma hodnotami
+-- =====================================================================
+WITH tabulkaLetSUM AS 
+(
+                SELECT ff.name,ff.fid,
+                SUM(CASE WHEN ar.year = 2019 THEN 1 ELSE 0 END) v2019,
+                SUM(CASE WHEN ar.year = 2020 THEN 1 ELSE 0 END) v2020
+                FROM z_field_ford ff join z_field_of_science fos ON fos.sid=ff.sid
+                JOIN z_year_field_journal yfj on yfj.fid=ff.fid
+                JOIN z_journal jou ON jou.jid=yfj.jid
+                JOIN z_article ar on ar.jid=yfj.jid AND yfj.year =ar.year
+                    WHERE yfj.year in (2020,2019)
+                    AND yfj.ranking LIKE 'Decil'
+                    AND fos.name like 'Engineering and Technology' 
+                        GROUP BY  ff.name,ff.fid
+)SELECT *, v2019-v2020
+ FROM tabulkaLetSUM;
+
+ WITH tabulkaLetCOUNT AS 
+(
+                SELECT ff.name,ff.fid,
+COUNT(DISTINCT CASE WHEN ar.year = 2019 THEN ar.aid END) AS v2019,
+COUNT(DISTINCT CASE WHEN ar.year = 2020 THEN ar.aid END) AS v2020
+                FROM z_field_ford ff join z_field_of_science fos ON fos.sid=ff.sid
+                JOIN z_year_field_journal yfj on yfj.fid=ff.fid
+                JOIN z_journal jou ON jou.jid=yfj.jid
+                JOIN z_article ar on ar.jid=yfj.jid AND yfj.year =ar.year
+                    WHERE yfj.year in (2020,2019)
+                    AND yfj.ranking LIKE 'Decil'
+                    AND fos.name like 'Engineering and Technology' 
+                        GROUP BY  ff.name,ff.fid
+)SELECT *, v2019-v2020
+ FROM tabulkaLetCOUNT;
+
+
+-- =====================================================================
+-- Naleznete obory FORD na kterych v roce 2020 nikdy nebylo vice nez 20 autoru
+-- =====================================================================
+
+WITH OboryPoctyAutoru AS
+(
+            SELECT ff.name AS obor,ar.name as clanek, COUNT(DISTINCT aaut.rid) pocetAutoru
+            FROM z_field_ford ff LEFT JOIN z_year_field_journal yfj ON yfj.fid=ff.fid AND yfj.year =2020
+            LEFT JOIN z_journal jou ON jou.jid=yfj.jid
+            LEFT JOIN z_article ar on ar.jid=jou.jid AND ar.year=2020
+            LEFT JOIN z_article_author aaut on aaut.aid=ar.aid
+                GROUP BY ff.name,ar.name
+)SELECT tab.obor,COALESCE(MAX(pocetAutoru), 0) AS maxAutoru
+from OboryPoctyAutoru tab 
+    GROUP BY  obor
+    HAVING COALESCE(MAX(pocetAutoru), 0)<=20
+
+
+ -- =====================================================================
+-- Vypište průměrný počet autorů na články v oborech FORD z oblasti 'Natural sciences',
+-- publikovaných v Q1 časopisech a spojených s institucí 'Nemocnice Na Homolce'.
+-- Pro každý obor zobrazte název oboru a průměrný počet autorů na článek.
+-- =====================================================================
+
+WITH oboryClankyPoctyAutoru AS 
+(
+    SELECT ff.name AS obor, ff.fid oborID,ar.name clanek, COUNT(DISTINCT aaut.rid) pocetAutoru
+    FROM z_field_ford ff join z_field_of_science fos ON fos.sid=ff.sid
+    JOIN z_year_field_journal yfj on yfj.fid=ff.fid
+    JOIN z_journal jou ON jou.jid=yfj.jid
+    JOIN z_article ar on ar.jid=yfj.jid AND yfj.year =ar.year
+    JOIN z_article_author aaut on aaut.aid=ar.aid
+    JOIN z_article_institution ai ON ai.aid=ar.aid
+    JOIN z_institution i ON i.iid=ai.iid
+        WHERE fos.name like 'Natural sciences' 
+        AND yfj.ranking like 'Q1'
+        AND i.name like 'Nemocnice Na Homolce'
+            GROUP BY ff.name, ff.fid,ar.name
+)
+SELECT obor, AVG(pocetAutoru)
+FROM oboryClankyPoctyAutoru
+    GROUP BY obor;
+
+-- =====================================================================
+--Naleznete instituce z ostravy nebo Olomouce, ktere maji alespoň jeden članek ohodnoceny jako Decil
+-- ve všech letech:2018,2019,2020
+-- =====================================================================
+WITH instituceOstravaOlomou2018 AS
+(
+            SELECT i.name AS instituce
+            FROM z_institution i join z_article_institution ai ON ai.iid=i.iid
+            JOIN z_article ar ON ar.aid=ai.aid
+            JOIN z_journal jou ON jou.jid=ar.jid
+            JOIN z_year_field_journal yfj ON yfj.jid=jou.jid AND ar.year=yfj.year
+                WHERE 
+                (i.town LIKE '%Ostrava%' OR i.town LIKE '%Olomouc%')
+                AND yfj.ranking like 'Decil'
+                AND ar.year = 2018
+
+), instituceOstravaOlomou2019 AS
+(
+            SELECT i.name AS instituce
+            FROM z_institution i join z_article_institution ai ON ai.iid=i.iid
+            JOIN z_article ar ON ar.aid=ai.aid
+            JOIN z_journal jou ON jou.jid=ar.jid
+            JOIN z_year_field_journal yfj ON yfj.jid=jou.jid AND ar.year=yfj.year
+                WHERE 
+                (i.town LIKE '%Ostrava%' OR i.town LIKE '%Olomouc%')
+                AND yfj.ranking like 'Decil'
+                AND ar.year = 2019
+
+), instituceOstravaOlomou2020 AS
+(
+            SELECT i.name AS instituce
+            FROM z_institution i join z_article_institution ai ON ai.iid=i.iid
+            JOIN z_article ar ON ar.aid=ai.aid
+            JOIN z_journal jou ON jou.jid=ar.jid
+            JOIN z_year_field_journal yfj ON yfj.jid=jou.jid AND ar.year=yfj.year
+                WHERE 
+                (i.town LIKE '%Ostrava%' OR i.town LIKE '%Olomouc%')
+                AND yfj.ranking like 'Decil'
+                AND ar.year =2020
+)
+SELECT DISTINCT i20.instituce
+FROM instituceOstravaOlomou2018 i18 JOIN instituceOstravaOlomou2019 i19 ON i18.instituce=i19.instituce
+JOIN instituceOstravaOlomou2020 i20 ON i20.instituce=i18.instituce
+
+
+--Stejne
+SELECT i.name AS instituce
+FROM z_institution i
+JOIN z_article_institution ai ON ai.iid = i.iid
+JOIN z_article ar ON ar.aid = ai.aid
+JOIN z_journal jou ON jou.jid = ar.jid
+JOIN z_year_field_journal yfj ON yfj.jid = jou.jid AND ar.year = yfj.year
+WHERE (i.town LIKE '%Ostrava%' OR i.town LIKE '%Olomouc%')
+  AND yfj.ranking LIKE 'Decil'
+  AND ar.year IN (2018, 2019, 2020)
+GROUP BY i.name
+HAVING COUNT(DISTINCT ar.year) = 3;
