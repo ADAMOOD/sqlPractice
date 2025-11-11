@@ -740,3 +740,35 @@ WHERE (i.town LIKE '%Ostrava%' OR i.town LIKE '%Olomouc%')
   AND ar.year IN (2018, 2019, 2020)
 GROUP BY i.name
 HAVING COUNT(DISTINCT ar.year) = 3;
+
+
+-- =====================================================================
+--Naleznete instituce které v letech 2018 a 2019 neměly nikdy žádné články s hodnocením Decil
+-- =====================================================================
+
+                    SELECT i.name AS instituce,COUNT(DISTINCT ar.aid)
+                    FROM z_institution i LEFT JOIN z_article_institution ai ON ai.iid=i.iid
+                    LEFT JOIN z_article ar ON ai.aid=ar.aid AND ar.year IN(2018,2019)
+                    LEFT JOIN z_journal jou ON jou.jid=ar.jid
+                    LEFT JOIN z_year_field_journal yfj ON yfj.jid=jou.jid AND yfj.ranking LIKE 'DECIL'
+                                                                          AND yfj.year = ar.year 
+                        GROUP BY i.name
+                            HAVING  COUNT(DISTINCT ar.aid)=0;
+
+
+
+-- =====================================================================
+--Naleznete autory kteri publikovali aspon v peti institucich s '%bio%' v nazvu
+-- =====================================================================
+SELECT 
+    aut.name AS autor,
+    COUNT(DISTINCT i.iid) AS pocetInstituci
+FROM z_author aut
+JOIN z_article_author aaut ON aut.rid = aaut.rid
+JOIN z_article ar ON aaut.aid = ar.aid
+JOIN z_article_institution ai ON ai.aid = ar.aid
+JOIN z_institution i ON i.iid = ai.iid
+    WHERE i.name LIKE '%bio%'
+        GROUP BY aut.name
+             HAVING COUNT(DISTINCT i.iid) >= 5
+                ORDER BY aut.name;
