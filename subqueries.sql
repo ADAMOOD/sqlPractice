@@ -772,3 +772,92 @@ JOIN z_institution i ON i.iid = ai.iid
         GROUP BY aut.name
              HAVING COUNT(DISTINCT i.iid) >= 5
                 ORDER BY aut.name;
+
+
+--vypsat instituce ktere v roce 2021 publikovaly aspon jeden clanek v kazdem oboru FORD z vedniho oboru 'Natural Sciences'
+WITH oboryZNaturalSciences AS
+(
+                SELECT ff.fid AS oborID, ff.name AS obor
+                From z_field_of_science fos join z_field_ford ff ON ff.sid=fos.sid
+                    where fos.name LIKE 'Natural Sciences'
+),
+instituceFordPocetClanku AS 
+(
+                SELECT i.name as instituce,ff.name as obor
+                FROM z_institution i JOIN z_article_institution ai ON ai.iid=i.iid
+                JOIN z_article ar ON ar.aid=ai.aid
+                JOIN z_journal jou ON jou.jid=ar.jid
+                JOIN z_year_field_journal yfj ON yfj.jid=jou.jid AND yfj.year=ar.year
+                JOIN z_field_ford ff ON ff.fid=yfj.fid
+) select * from instituceFordPocetClanku;
+
+
+
+-- Vypsat instituce, které v roce 2021 publikovaly alespoň jeden článek-- v každém oboru FORD spadajícím do vědního oboru "Natural Sciences"
+WITH oboryZNaturalSciences AS (
+    SELECT ff.fid AS oborID, ff.name AS obor
+    FROM z_field_of_science fos
+    JOIN z_field_ford ff ON ff.sid = fos.sid
+    WHERE fos.name = 'Natural Sciences'
+),
+instituceFordPocetClanku AS (
+    SELECT i.iid AS idInstituce,i.name AS instituce,ff.fid AS oborID,ff.name AS obor,COUNT(DISTINCT ar.aid) AS pocet_clanku
+    FROM z_institution i
+    JOIN z_article_institution ai ON ai.iid = i.iid
+    JOIN z_article ar ON ar.aid = ai.aid
+    JOIN z_journal jou ON jou.jid = ar.jid
+    JOIN z_year_field_journal yfj 
+        ON yfj.jid = jou.jid AND yfj.year = ar.year
+    JOIN z_field_ford ff ON ff.fid = yfj.fid
+         WHERE ar.year = 2021
+            AND ff.fid IN (
+                        SELECT oborID FROM oboryZNaturalSciences
+                          )
+                GROUP BY i.iid, i.name, ff.fid, ff.name
+)SELECT i.instituce, idInstituce
+FROM instituceFordPocetClanku i
+GROUP BY i.instituce, idInstituce
+HAVING COUNT(DISTINCT i.oborID) = (
+    SELECT COUNT(*) FROM oboryZNaturalSciences
+)
+ORDER BY i.instituce;
+
+--hotovo
+
+--vypsat vsechny roky, kdy casopis 'biochemia medica' byl v oboru ford '2.6 Medical engineering' zarazen
+--v rankingu do 'Q1' . u kazdeho roku vypsat celkovy pocet casopisu zarazenych do stejneho rankingu v danem oboru
+WITH rokyCasopisu AS
+(
+            SELECT yfj.year AS rok, jou.name AS casopis, jou.jid idCasopisu
+            FROM z_journal jou JOIN z_year_field_journal yfj ON yfj.jid=jou.jid
+            JOIN z_field_ford ff ON ff.fid = yfj.fid
+                WHERE jou.name LIKE 'biochemia medica'
+                  AND yfj.ranking LIKE 'Q1'
+                  AND ff.name LIKE '2.6 Medical engineering'
+)SELECT roky.rok AS rok, roky.casopis as hledanyCasopis, COUNT(jou.jid) as pocetCasopisuTohotoRoku
+            FROM z_journal jou JOIN z_year_field_journal yfj ON yfj.jid=jou.jid
+            JOIN z_field_ford ff ON ff.fid = yfj.fid 
+            JOIN rokyCasopisu roky ON roky.rok = yfj.year
+                  AND yfj.ranking LIKE 'Q1'
+                  AND ff.name LIKE '2.6 Medical engineering'
+                    GROUP BY roky.rok,roky.casopis;
+                    --hotovo
+
+--vyberte casopisy, ktere byli v prubehu let 2017-2021 v oboru FORD '2.4 Chemical engineering'
+--zarazeny v ruznych hodnocenich (atribut ranking)  (aspon ve dvou ruznych)
+    WITH casopisy AS (
+    SELECT jou.jid AS casopisID,jou.name AS casopis,COUNT(DISTINCT yfj.ranking) AS pocetOhodnoceni
+    FROM z_journal jou
+    JOIN z_year_field_journal yfj ON yfj.jid = jou.jid
+    JOIN z_field_ford ff ON ff.fid = yfj.fid
+    WHERE 
+        ff.name LIKE '2.4 Chemical engineering'
+        AND yfj.year IN (2017, 2018, 2019, 2020,2021)
+    GROUP BY jou.jid, jou.name
+)
+SELECT *
+FROM casopisy
+WHERE pocetOhodnoceni >= 2
+ORDER BY casopis;
+--#zamrdano
+--40 bodu
