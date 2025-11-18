@@ -286,3 +286,249 @@ DROP CONSTRAINT chk_logdate_ok;
 
 --12) Drop tabulku
 DROP TABLE z_article_log;
+
+
+INSERT INTO actor(first_name,last_name)
+VALUES ('Arnold','Schwarzenegger')
+
+INSERT INTO film(title,description,language_id,length,release_year,rating,special_features)
+VALUES('TERMINATOR',
+       'Z roku 2029 je do Los Angeles roku 1984,',
+       1,
+       1984,
+       187,
+       'PG-13',
+       'Trailers');
+
+	   select * from film where title like 'TERMINATOR'
+
+	   	   select * from actor where first_name like 'Arnold'
+
+
+	   insert into film_actor(actor_id,film_id)
+	   values(201,1001)
+
+	   INSERT INTO film_category(category_id,film_id)
+	   select category_id,1001
+	   from category
+	   where name IN ('Action','Sci-Fi')
+
+update film
+set rental_rate = 2.99,last_update= CURRENT_TIMESTAMP
+where title like 'TERMINATOR'
+
+select * from film
+
+update film
+set rental_rate = rental_rate * 1.1
+where film_id in (select fa.film_id
+					from film_actor fa join actor ac on ac.actor_id=fa.actor_id
+					where ac.first_name like 'ZERO' AND ac.last_name like 'CAGE')
+
+select * from language
+
+
+
+--6
+update film
+set language_id = NULL 
+where language_id =4
+
+update film
+set original_language_id = NULL 
+where original_language_id =4
+
+delete from language
+where name like 'Mandarin'
+
+
+--5 
+insert into inventory(film_id,store_id)
+select fa.film_id,2
+					from film_actor fa join actor ac on ac.actor_id=fa.actor_id
+					where ac.first_name like 'GROUCHO' AND ac.last_name like 'SINATRA'
+--8
+select * from customer
+
+delete rental
+where customer_id IN (select customer_id from customer
+where active like '0')
+
+delete payment
+where customer_id IN (select customer_id from customer
+where active like '0')
+
+delete from customer
+where active like '0'
+
+--9
+ALTER TABLE film
+add inventory_count int 
+
+select * from film
+update film
+set inventory_count = (select count(*) from inventory where film_id=film.film_id)
+
+
+alter table category
+alter column name varchar(50)
+
+--11
+select * from address
+alter table customer 
+ADD phone VARCHAR(20) not null default ' '
+
+
+UPDATE customer 
+SET customer.phone = (
+    SELECT ad.phone
+    FROM address ad
+    WHERE ad.address_id = customer.address_id
+);
+
+--12
+alter table rental
+add create_date datetime not null 
+	CONSTRAINT IO_default_timestamp_create_date default CURRENT_TIMESTAMP
+
+alter table rental
+drop constraint IO_default_timestamp_create_date
+
+alter table rental
+drop column create_date
+
+--14
+alter table film
+add creator_staff_id tinyint 
+	CONSTRAINT FK_TO_STAFF foreign key references staff(staff_id)
+
+		alter table film 
+	drop constraint FK_TO_STAFF
+
+	alter table film 
+	drop column creator_staff_id
+
+
+--18
+CREATE TABLE reservation (
+	reservation_id int primary key identity,
+	reservation_date date not null ,
+	end_date date not null,
+	custommer_id int references customer(customer_id),
+	film_id int references film,
+	staff_id tinyint references staff
+)
+
+--19
+insert into reservation
+ values ('2025-11-18','2025-11-19',1,1,1)
+ insert into reservation
+ values ('2025-11-18','2025-11-19',1,1,1)
+
+ select * from reservation
+
+
+--23
+CREATE TABLE rating(
+rating_id int identity primary key,
+name varchar(10) not null,
+description varchar
+)
+
+insert into rating (name)
+select distinct rating
+from film 
+
+select * from rating
+
+alter table film
+add rating_id int default 1 not null references rating
+
+update film
+set film.rating_id = (select rating_id from rating where rating.name LIKE film.rating)
+
+select * from film
+
+--ZADANI:
+--5 -----------------------------------------------
+insert into inventory(film_id,store_id)
+select fa.film_id,2
+					from film_actor fa join actor ac on ac.actor_id=fa.actor_id
+					where ac.first_name like 'GROUCHO' AND ac.last_name like 'SINATRA'
+--8-----------------------------------------
+select * from customer
+
+delete rental
+where customer_id IN (select customer_id from customer
+where active like '0')
+
+delete payment
+where customer_id IN (select customer_id from customer
+where active like '0')
+
+delete from customer
+where active like '0'
+
+--11---------------------------------------------
+select * from address
+alter table customer 
+ADD phone VARCHAR(20) not null default ' '
+
+
+UPDATE customer 
+SET customer.phone = (
+    SELECT ad.phone
+    FROM address ad
+    WHERE ad.address_id = customer.address_id
+);
+
+
+--14------------------------------------------
+alter table film
+add creator_staff_id tinyint 
+	CONSTRAINT fk film staff foreign key references staff(staff_id)
+
+		alter table film 
+	drop constraint fk film staff
+
+	alter table film 
+	drop column creator_staff_id
+
+--19-------------------------------------
+insert into reservation
+ values ('2025-11-18','2025-11-19',1,1,1)
+ insert into reservation
+ values ('2025-11-18','2025-11-19',1,1,1)
+
+ select * from reservation
+
+
+
+ --23--------------------------------------
+CREATE TABLE rating(
+rating_id int identity primary key,
+name varchar(10) not null,
+description varchar
+)
+
+insert into rating (name)
+select distinct rating
+from film 
+
+select * from rating
+
+alter table film
+add rating_id int default 1 references rating
+
+update film
+set film.rating_id = (select rating_id from rating where rating.name LIKE film.rating)
+
+select * from film
+
+alter table film 
+drop constraint CHECK_special_rating
+
+alter table film 
+drop column rating
+
+-- 5 bodu!!
