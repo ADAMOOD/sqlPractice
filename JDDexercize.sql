@@ -1,7 +1,7 @@
 ---- TEST 2 - SQL JDD ----
--- 1. Vytvo¯te tabulku s n·zvem z_autor_vsb se stejn˝mi atributy a prim·rnÌm klÌËem jako 
--- tabulka z_author (atribut rid nebude oznaËen jako identity) a dalöÌm atributem 
--- faculty varchar(3), jehoû hodnota m˘ûe b˝t null.
+-- 1. Vytvo≈ôte tabulku s n√°zvem z_autor_vsb se stejn√Ωmi atributy a prim√°rn√≠m kl√≠ƒçem jako 
+-- tabulka z_author (atribut rid nebude oznaƒçen jako identity) a dal≈°√≠m atributem 
+-- faculty varchar(3), jeho≈æ hodnota m≈Ø≈æe b√Ωt null.
 CREATE TABLE z_autor_vsb (
 	zav_identity INT NOT NULL PRIMARY KEY,
 	zav_name VARCHAR(200) NOT NULL,
@@ -12,28 +12,28 @@ CREATE TABLE z_autor_vsb (
 select * from z_author
 select * from z_autor_vsb
 
--- 2. Do tabulky z_autor_vsb vloûte jednÌm p¯Ìkazem insert - select vöechny z·znamy autor˘, kte¯Ì
--- jsou autory Ël·nk˘, u kter˝ch je uvedena instituce 
--- 'Vysok· ökola b·Úsk· - Technick· univerzita Ostrava'. 
--- Hodnotu atribut faculty nastavte explicitnÏ na null.
+-- 2. Do tabulky z_autor_vsb vlo≈æte jedn√≠m p≈ô√≠kazem insert - select v≈°echny z√°znamy autor≈Ø, kte≈ô√≠
+-- jsou autory ƒçl√°nk≈Ø, u kter√Ωch je uvedena instituce 
+-- 'Vysok√° ≈°kola b√°≈àsk√° - Technick√° univerzita Ostrava'. 
+-- Hodnotu atribut faculty nastavte explicitnƒõ na null.
 INSERT INTO z_autor_vsb
 SELECT DISTINCT aut.*, null
 FROM z_author aut  JOIN z_article_author aaut on aut.rid=aaut.rid
 	JOIN z_article ar ON ar.aid=aaut.aid
 	JOIN z_article_institution ai on ai.aid=ar.aid
 	JOIN z_institution i ON i.iid=ai.iid
-WHERE i.name LIKE 'Vysok· ökola b·Úsk· - Technick· univerzita Ostrava'
+WHERE i.name LIKE 'Vysok√° ≈°kola b√°≈àsk√° - Technick√° univerzita Ostrava'
 
--- Napiöte dotaz, kter˝ vr·tÌ poËet z·znam˘ tabulky z_autor_vsb.
+-- Napi≈°te dotaz, kter√Ω vr√°t√≠ poƒçet z√°znam≈Ø tabulky z_autor_vsb.
 SELECT COUNT(*) AS pocetZaznamu
 from z_autor_vsb
 
--- 3. Aktualizujte hodnotu atributu faculty tabulky z_author_vsb na hodnotu 'fei' u vöech z·znam˘.
+-- 3. Aktualizujte hodnotu atributu faculty tabulky z_author_vsb na hodnotu 'fei' u v≈°ech z√°znam≈Ø.
 UPDATE z_autor_vsb 
 SET zav_faculty='fei'
 
--- 4. Napiöte dotaz vracejÌcÌ poËet autor˘ z tabulky z_author_vsb, kte¯Ì jsou z fakulty 'fei' 
--- a druh˝ dotaz pro poËet autor˘ z fakulty 'fs'.
+-- 4. Napi≈°te dotaz vracej√≠c√≠ poƒçet autor≈Ø z tabulky z_author_vsb, kte≈ô√≠ jsou z fakulty 'fei' 
+-- a druh√Ω dotaz pro poƒçet autor≈Ø z fakulty 'fs'.
 
 SELECT COUNT(*)
 FROM z_autor_vsb
@@ -43,15 +43,15 @@ SELECT COUNT(*)
 FROM z_autor_vsb
 WHERE zav_faculty LIKE 'fs'
 
--- 5. Do tabulky z_author_vsb p¯idejte atribut department int jehoû hodnota m˘ûe b˝t null.
+-- 5. Do tabulky z_author_vsb p≈ôidejte atribut department int jeho≈æ hodnota m≈Ø≈æe b√Ωt null.
 ALTER TABLE z_autor_vsb
 ADD department INT 
 
 SELECT * FROM z_autor_vsb
 
 
--- 6. Aktualizujte hodnotu atributu department tabulky z_author_vsb na 460 pro autory se jmÈny
--- zaËÌnajÌcÌmi na 'S'. Vypiöte poËet autor˘ z katedry 460.
+-- 6. Aktualizujte hodnotu atributu department tabulky z_author_vsb na 460 pro autory se jm√©ny
+-- zaƒç√≠naj√≠c√≠mi na 'S'. Vypi≈°te poƒçet autor≈Ø z katedry 460.
 UPDATE z_autor_vsb
 SET department = 460
 WHERE zav_name LIKE 'S%'
@@ -60,16 +60,16 @@ SELECT COUNT(*)
 FROM z_autor_vsb
 WHERE department = 460
 
--- 7. Aktualizujte hodnotu atributu department tabulky z_author_vsb na 460 pro autory se jmÈny
--- zaËÌnajÌcÌmi na 'S'. Pro vöechny ostatnÌ autory nastavte hodnotu department na 470. ÿeöte jednÌm 
--- p¯Ìkazem update.
+-- 7. Aktualizujte hodnotu atributu department tabulky z_author_vsb na 460 pro autory se jm√©ny
+-- zaƒç√≠naj√≠c√≠mi na 'S'. Pro v≈°echny ostatn√≠ autory nastavte hodnotu department na 470. ≈òe≈°te jedn√≠m 
+-- p≈ô√≠kazem update.
 UPDATE z_autor_vsb
 SET department = CASE 
 				WHEN zav_name LIKE 'S%' THEN 460
 				WHEN zav_name NOT LIKE 'S%' THEN 470
 				END
 
--- 8. Vypiöte poËet autor˘ z katedry 460 a druh˝m dotazem poËet autor˘ z katedry 470.
+-- 8. Vypi≈°te poƒçet autor≈Ø z katedry 460 a druh√Ωm dotazem poƒçet autor≈Ø z katedry 470.
 SELECT COUNT(*) AS pocet_autoru_z_katedry_460
 FROM z_autor_vsb
 WHERE department = 460
@@ -78,8 +78,8 @@ SELECT COUNT(*) AS pocet_autoru_z_katedry_470
 FROM z_autor_vsb
 WHERE department = 470
 
--- 9. Z tabulky z_author_vsb smaûte vöechny z·znamy s katedrou 470 a dalöÌm dotazem zjistÏte
--- aktu·lnÌ poËet z·znam˘ v tabulce.
+-- 9. Z tabulky z_author_vsb sma≈æte v≈°echny z√°znamy s katedrou 470 a dal≈°√≠m dotazem zjistƒõte
+-- aktu√°ln√≠ poƒçet z√°znam≈Ø v tabulce.
 DELETE 
 FROM z_autor_vsb 
 WHERE department = 470
@@ -87,10 +87,10 @@ WHERE department = 470
 SELECT COUNT(*)
 FROM z_autor_vsb
 
--- 10. Do tabulky z_author_vsb p¯idejte atribut last_update typu date s kontrolou hodnoty pomocÌ
+-- 10. Do tabulky z_author_vsb p≈ôidejte atribut last_update typu date s kontrolou hodnoty pomoc√≠
 -- check >= '2025-11-11'. 
--- A pokuste se p¯idat dva z·znamy: jeden vyhovujÌcÌ podmÌnce a druh˝
--- nevyhovujÌcÌ podmÌnce (a zapiöte se n·zev integritnÌho omezenÌ pro check).
+-- A pokuste se p≈ôidat dva z√°znamy: jeden vyhovuj√≠c√≠ podm√≠nce a druh√Ω
+-- nevyhovuj√≠c√≠ podm√≠nce (a zapi≈°te se n√°zev integritn√≠ho omezen√≠ pro check).
 
 ALTER TABLE z_autor_vsb
 ADD last_update date
@@ -100,8 +100,8 @@ INSERT INTO z_autor_vsb (zav_identity,zav_name,last_update)
 	VALUES (100000,'vyhovujici podmince','2025-11-11'),
 			(100001,'nevyhovujici podmince','2025-10-10')
 
--- 11. Zruöte integritnÌ omezenÌ check pro lastupdate (alter table ... drop constraint ...) a 
--- pokust se znovu  vloûit ne˙spÏönÏ vloûen˝ z·znam.
+-- 11. Zru≈°te integritn√≠ omezen√≠ check pro lastupdate (alter table ... drop constraint ...) a 
+-- pokust se znovu  vlo≈æit ne√∫spƒõ≈°nƒõ vlo≈æen√Ω z√°znam.
 
 ALTER TABLE z_autor_vsb
 DROP CONSTRAINT ok_last_upadet
@@ -109,15 +109,15 @@ DROP CONSTRAINT ok_last_upadet
 INSERT INTO z_autor_vsb (zav_identity,zav_name,last_update)
 	VALUES (100001,'nevyhovujici podmince','2025-10-10')
 
--- 12. Zruöte tabulku z_author_vsb.
+-- 12. Zru≈°te tabulku z_author_vsb.
 DROP TABLE z_autor_vsb
 
 
 --DALSI!!!!!!
---Vytvo¯ tabulku z_institution_copy
---stejnÈ atributy jako z_institution
---prim·rnÌ klÌË jako v origin·lu
---navÌc atribut region VARCHAR(50), kter˝ m˘ûe b˝t NULL
+--Vytvo≈ô tabulku z_institution_copy
+--stejn√© atributy jako z_institution
+--prim√°rn√≠ kl√≠ƒç jako v origin√°lu
+--nav√≠c atribut region VARCHAR(50), kter√Ω m≈Ø≈æe b√Ωt NULL
 --atribut iid nebude identity
 CREATE TABLE z_institution_copy(
 	iid int not null PRIMARY KEY,
@@ -131,25 +131,25 @@ CREATE TABLE z_institution_copy(
 	created datetime2(7),
 	region varchar(50))
 
---Vloû do z_institution_copy vöechny instituce z mÏst obsahujÌcÌ ÑPrahaì
---jednÌm InsertñSelect
+--Vlo≈æ do z_institution_copy v≈°echny instituce z mƒõst obsahuj√≠c√≠ ‚ÄûPraha‚Äú
+--jedn√≠m Insert‚ÄìSelect
 --region nastav na 'CZ'
 INSERT INTO z_institution_copy 
 	SELECT *,'CZ'
 	FROM z_institution
 	WHERE town LIKE '%Praha%'
 
---3) Vypiö poËet vloûen˝ch institucÌ
+--3) Vypi≈° poƒçet vlo≈æen√Ωch instituc√≠
 SELECT COUNT(*)
 FROM z_institution_copy
 
---4) P¯idej do tabulky atribut is_public INT NOT NULL DEFAULT(1)
+--4) P≈ôidej do tabulky atribut is_public INT NOT NULL DEFAULT(1)
 ALTER TABLE z_institution_copy 
 ADD is_public INT NOT NULL DEFAULT(1)
 
 --5) Aktualizuj:
---nastav is_public = 0 pro instituce, jejichû jmÈno obsahuje Ñs.r.o.ì
---ostatnÌm nech p˘vodnÌ hodnotu
+--nastav is_public = 0 pro instituce, jejich≈æ jm√©no obsahuje ‚Äûs.r.o.‚Äú
+--ostatn√≠m nech p≈Øvodn√≠ hodnotu
 --(Jeden UPDATE.)
 UPDATE  z_institution_copy 
 SET is_public = 0 
@@ -157,44 +157,132 @@ WHERE name LIKE '%s.r.o.'
 
 select*from z_institution_copy where name LIKE '%s.r.o.'
 
---6) Vypiö poËet Ñsoukrom˝chì (is_public=0)
+--6) Vypi≈° poƒçet ‚Äûsoukrom√Ωch‚Äú (is_public=0)
 select COUNT(*)
 from z_institution_copy 
 where name LIKE '%s.r.o.'
 
---7) Smaû vöechny instituce, kterÈ majÌ region 'CZ' a souËasnÏ nejsou ve¯ejnÈ
+--7) Sma≈æ v≈°echny instituce, kter√© maj√≠ region 'CZ' a souƒçasnƒõ nejsou ve≈ôejn√©
 DELETE FROM z_institution_copy
 WHERE region LIKE 'CZ' AND is_public = 1
 
---8) Vypiö poËet z·znam˘ po maz·nÌ
+--8) Vypi≈° poƒçet z√°znam≈Ø po maz√°n√≠
 select COUNT(*)
 from z_institution_copy 
 where name LIKE '%s.r.o.'
 
---9) P¯idej sloupec created_on DATE
---	s CHECK ûe datum musÌ b˝t vÏtöÌ nebo rovno 2020-01-01
+--9) P≈ôidej sloupec created_on DATE
+--	s CHECK ≈æe datum mus√≠ b√Ωt vƒõt≈°√≠ nebo rovno 2020-01-01
 ALTER TABLE z_institution_copy
 ADD created_on DATE
 	CONSTRAINT created_on_ok check (created_on>='2020-01-01')
 
---10) Pokus se vloûit:
---jeden z·znam splÚujÌcÌ check
---jeden poruöujÌcÌ check
---Zapiö JAK se jmenovalo omezenÌ.
+--10) Pokus se vlo≈æit:
+--jeden z√°znam spl≈àuj√≠c√≠ check
+--jeden poru≈°uj√≠c√≠ check
+--Zapi≈° JAK se jmenovalo omezen√≠.
 insert into z_institution_copy (iid,name,created_on)
 	values (5000,'neporusujici pravidlo','2020-01-01'),
 			(5001,'porusujici check', '2019-12-30')
 
---11) OdstraÚ check
+--11) Odstra≈à check
 
 ALTER TABLE z_institution_copy
 DROP CONSTRAINT created_on_ok
 
---zkus znovu vloûit problÈmov˝ ¯·dek
+--zkus znovu vlo≈æit probl√©mov√Ω ≈ô√°dek
 insert into z_institution_copy (iid,name,created_on)
 	values (5001,'porusujici check', '2019-12-30')
 
 select * from z_institution_copy
 
---12) Smaû celou tabulku
+--12) Sma≈æ celou tabulku
 DROP TABLE z_institution_copy
+
+
+
+
+
+--Vytvo≈ô tabulku z_article_log
+--atributy:
+--entry_id INT PRIMARY KEY
+--aid INT NOT NULL
+--log_date DATE NOT NULL
+--note VARCHAR(200) NULL
+--FK na z_article(aid)
+CREATE TABLE z_article_log(
+	entry_id INT PRIMARY KEY,
+	aid INT NOT NULL FOREIGN KEY REFERENCES z_article(aid),
+	log_date DATE NOT NULL,
+	note VARCHAR(200) NULL,
+)
+
+--2) Vlo≈æ v≈°echny ƒçl√°nky z roku 2020
+--ka≈æd√Ω dostane log_date = '2025-01-01'
+--note = 'imported'
+INSERT INTO z_article_log (entry_id, aid, log_date, note)
+SELECT 
+    ROW_NUMBER() OVER (ORDER BY aid) AS entry_id,
+    aid,
+    '2025-01-01',
+    'imported'
+FROM z_article
+WHERE year = 2020;
+
+--3) Vypi≈° kolik jsi vlo≈æil z√°znam≈Ø
+SELECT COUNT(*)
+FROM z_article_log
+
+--4) P≈ôidej sloupec priority INT s DEFAULT 1
+ALTER TABLE z_article_log
+ADD priority INT DEFAULT 1
+
+--Aktualizuj:
+--priority = 5 pro ƒçl√°nky z ƒçasopis≈Ø ranking 'Q1'
+--priority = 3 pro Q2
+--priority = 1 pro ostatn√≠
+--(jeden UPDATE + CASE + join)
+UPDATE al
+SET al.priority = CASE
+        WHEN yfj.ranking = 'Q1' THEN 5
+        WHEN yfj.ranking = 'Q2' THEN 3
+        ELSE 1
+    END
+FROM z_article_log al
+JOIN z_article ar ON al.aid = ar.aid
+JOIN z_journal jou ON ar.jid = jou.jid
+JOIN z_year_field_journal yfj ON yfj.jid=jou.jid;
+
+--6) Vypi≈° poƒçet log≈Ø s priority 5
+SELECT * 
+FROM z_article_log
+WHERE priority = 5
+
+--Sma≈æ v≈°echny logy ƒçl√°nk≈Ø, kter√© nepat≈ô√≠ ≈æ√°dn√© instituci obsahuj√≠c√≠ ‚ÄûUniversity‚Äú
+DELETE al
+FROM z_article_log al
+JOIN z_article ar ON al.aid = ar.aid
+JOIN z_article_institution ai ON ai.aid=ar.aid
+JOIN z_institution i ON ai.iid=i.iid
+WHERE i.name LIKE '%University%'
+
+--8) Vypi≈° nov√Ω poƒçet z√°znam≈Ø
+SELECT COUNT(*)
+FROM z_article_log
+
+--9) P≈ôidej CHECK ≈æe log_date >= '2024-01-01'
+ALTER TABLE z_article_log
+ADD CONSTRAINT chk_logdate_ok
+CHECK (log_date >= '2024-01-01');
+
+--10) Zkus vlo≈æit nevalidn√≠ log_date ‚Üí oƒçek√°van√° chyba
+INSERT INTO z_article_log (entry_id, aid, log_date, note)
+VALUES (9999, 1, '2023-12-31', 'invalid test');
+
+
+--11) Drop constraint ‚Üí vlo≈æ znovu
+ALTER TABLE z_article_log
+DROP CONSTRAINT chk_logdate_ok;
+
+--12) Drop tabulku
+DROP TABLE z_article_log;
