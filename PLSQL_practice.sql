@@ -122,3 +122,81 @@ UPDATE work_z_author SET name = 'Sharma, A. TEST' WHERE rid = 3604;
 COMMIT;
 
 SELECT * FROM work_z_author_name_changes;
+SELECT * FROM work_z_author_name_changes;
+
+
+
+DROP TABLE work_z_author
+CREATE  TABLE work_z_author as SELECT * FROM z_author;
+CREATE TABLE work_z_article_author AS SELECT * FROM Z_article_author;
+
+CREATE PROCEDURE P_DeleteAuthorByName(p_author_name VARCHAR2) 
+      AS
+        v_author_id int := NULL;
+        v_rows_count int := NULL;
+      BEGIN
+        IF p_author_name IS NULL THEN
+            dbms_output.put_line('NULL PARAMETER');
+            RETURN;-- jaky je rozdil mezi timto a ROLLBACK; neni return jen vec funkci nebylo by tady validnejsi dat rollback?
+        END IF;
+        SELECT rid INTO v_author_id FROM work_z_author WHERE name = p_author_name;
+        DELETE FROM work_z_article_author WHERE rid = v_author_id;
+        v_rows_count :=  SQL%ROWCOUNT; 
+        DELETE FROM work_z_author WHERE rid = v_author_id;
+                dbms_output.put_line('Autor '||p_author_name||' uspesne smazan.');
+                dbms_output.put_line('Odstraneno zaznamu z  vazebni tabulky: '||v_rows_count);
+        COMMIT;
+        EXCEPTION 
+             WHEN NO_DATA_FOUND THEN
+                dbms_output.put_line('Autor '||p_author_name||' neexistuje');
+                ROLLBACK;
+            WHEN OTHERS THEN
+            dbms_output.put_line('ERROR pri mazani');
+                ROLLBACK;
+      END;
+      
+      
+SELECT * FROM work_z_article_author;
+CREATE TABLE work_z_article AS SELECT * FROM z_article;
+SELECT * FROM work_z_article;
+--trigger spusteny pri delete bude logovat do tabulky work_z_article_deleted pouze clanky
+--ktere maji 3 a mene autoru
+-- TOHLE ZKOPIRUJE STRUKTURU TABULKY ALE NIC NEVLOZI
+CREATE TABLE work_z_article_deleted AS SELECT * FROM work_z_article WHERE 1 = 0;
+
+CREATE OR REPLACE TRIGGER TR_DeleteAudit
+AFTER DELETE ON work_z_article
+FOR EACH ROW
+DECLARE
+    v_authors_count INT;
+    BEGIN 
+        SELECT COUNT(rid) INTO v_authors_count 
+        FROM work_z_article_author 
+        WHERE aid = :OLD.aid;
+        IF v_authors_count > 3 THEN
+        RETURN;--ukoncim cely trigger jelikoz nechci ukladat ty s vice jak 3 clanky
+        --udelal jsem to takhle schvalne naopak nez v predeslem triggeru kde jsem mel if
+        --pro validni stav
+        END IF;
+        INSERT INTO work_z_article_deleted  VALUES (:OLD.aid ,
+        :OLD.jid ,
+        :OLD.ut_wos ,
+        :OLD.type ,
+        :OLD.name ,
+        :OLD.year ,
+        :OLD.author_count);
+                dbms_output.put_line('MAZANY RADEK'||:OLD.aid ||' '||
+        :OLD.jid ||' '||
+        :OLD.ut_wos ||' '||
+        :OLD.name ||' '||
+        :OLD.year ||' '||
+        :OLD.type ||' '||
+        :OLD.author_count);
+        EXCEPTION 
+            WHEN OTHERS THEN
+                raise_application_error(-2001,'CHYBA PRI AUDITOVANI MAZANYCH CLANKU');
+    END;
+
+SELECT * FROM work_z_article;
+DELETE FROM work_z_article WHERE aid = 2;
+
