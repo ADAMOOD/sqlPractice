@@ -1,0 +1,183 @@
+\documentclass[12pt,a4paper]{article}
+
+% Balíčky pro češtinu a kódování
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[czech]{babel}
+
+% Balíčky pro grafiku a rozvržení
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{xcolor}
+\usepackage{hyperref}
+
+% Nastavení pro hezké výpisy PL/SQL kódu
+\usepackage{listings}
+\definecolor{codegreen}{rgb}{0,0.6,0}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\definecolor{backcolour}{rgb}{0.95,0.95,0.92}
+
+\lstdefinestyle{mystyle}{
+    backgroundcolor=\color{backcolour},   
+    commentstyle=\color{codegreen},
+    keywordstyle=\color{blue}\bfseries,
+    numberstyle=\tiny\color{codegray},
+    stringstyle=\color{codepurple},
+    basicstyle=\ttfamily\footnotesize,
+    breakatwhitespace=false,         
+    breaklines=true,                 
+    captionpos=b,                    
+    keepspaces=true,                 
+    numbers=left,                    
+    numbersep=5pt,                  
+    showspaces=false,                
+    showstringspaces=false,
+    showtabs=false,                  
+    tabsize=2,
+    language=SQL
+}
+\lstset{style=mystyle}
+
+\title{\textbf{Ultimátní PL/SQL Tahák a Chytáky}}
+\author{Můj Osobní Kodex pro Oracle DB}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+\tableofcontents
+\newpage
+
+\section{Systémový katalog a Záludnosti Oracle prostředí}
+\begin{itemize}
+    \item \textbf{Velká písmena v katalogu:} Systémové pohledy (\texttt{USER\_TABLES}, \texttt{USER\_TAB\_COLUMNS}) ukládají názvy objektů zásadně \textbf{VELKÝMI PÍSMENY}. Dotaz musí hledat \texttt{'NAZEV\_TABULKY'}, případně použij funkci \texttt{UPPER(promenna)}.
+    \item \textbf{Apostrofy vs. Uvozovky:}
+    \begin{itemize}
+        \item \texttt{' '} (Jednoduché apostrofy): Slouží pro textové řetězce (Stringy). Příklad: \texttt{v\_text := 'Z\_INSTITUTION';}
+        \item \texttt{" "} (Dvojité uvozovky): Slouží k vynucení přesného názvu objektu (tabulky/sloupce). Pokud je použiješ na text, databáze spadne, protože hledá proměnnou daného jména (Chyba \texttt{PLS-00201}).
+    \end{itemize}
+    \item \textbf{Došlo místo (Chyba ORA-01652):} Kód je správně, ale školní databáze je plná. Řešení: Vysypat koš příkazem \textbf{\texttt{PURGE RECYCLEBIN;}} nebo natvrdo smazat staré tabulky příkazem \texttt{DROP TABLE nazev PURGE;}.
+\end{itemize}
+
+\section{Zlatá pravidla a PL/SQL Logika}
+\begin{itemize}
+    \item \textbf{Vždy \texttt{INTO}:} Uvnitř \texttt{BEGIN...END} nesmí být volný \texttt{SELECT}. Vždy musí být \texttt{SELECT sloupec INTO promenna}.
+    \item \textbf{Syntaxe \texttt{ELSIF}:} Píše se zásadně dohromady (ne \texttt{ELSE IF}), jinak překladač vyhodí chybu.
+    \item \textbf{Záchranný \texttt{RETURN} ve funkcích:} Pokud je v kódu série \texttt{IF/ELSIF}, vždy musí být na úplném konci funkce ještě jeden "bezpečnostní" \texttt{RETURN}, pro případ, že propadne hodnota \texttt{NULL}. Dále musí být \texttt{RETURN} i uvnitř bloku \texttt{EXCEPTION}!
+    \item \textbf{\texttt{RETURN} vs. \texttt{ROLLBACK}:}
+    \begin{itemize}
+        \item \texttt{RETURN} okamžitě ukončí běh procedury/funkce.
+        \item \texttt{ROLLBACK} zruší změny v datech, ale \textbf{neukončí} běh kódu.
+    \end{itemize}
+    \item \textbf{Inkrementace (Počítadlo):} Zásadně se nedělá přes \texttt{INSERT} (ten vytváří nový řádek). Dělá se přičtením k existující hodnotě na místě: \texttt{UPDATE tabulka SET pocet = pocet + 1 WHERE id = ...;}
+\end{itemize}
+
+\section{Tabulky a Datové modelování}
+\begin{itemize}
+    \item \textbf{Kopie struktury bez dat:} \texttt{CREATE TABLE nova AS SELECT * FROM stara WHERE 1 = 0;}
+    \item \textbf{CTAS ztrácí vazby:} \texttt{CREATE TABLE AS SELECT} přenese jen sloupce a data. \textbf{Nepřenáší} primární klíče, cizí klíče ani indexy.
+    \item \textbf{Složený primární klíč (M:N vazby):} Ve vazební tabulce nelze dát dvěma sloupcům samostatný PK. Musí se vytvořit jeden společný: \texttt{ALTER TABLE vazba ADD CONSTRAINT pk\_vazba PRIMARY KEY (sloupec\_A, sloupec\_B);}
+    \item \textbf{Vztah 1:1 (Optional to Mandatory):} Pro otázky a logiku Oracle Academy platí specifikum -- Cizí klíč (FK) se umisťuje \textbf{vždy na povinnou stranu} (do Tabulky B), i když se běžně vyučuje jiný postup.
+    \item \textbf{Kompilační past:} Volání procedury, která vytvoří tabulku, a následný \texttt{SELECT} na tuto novou tabulku nelze spustit v jednom bloku. Musí se oddělit lomítkem \texttt{/}.
+\end{itemize}
+
+\section{Dynamické vs. Statické SQL a Proměnné}
+\textbf{Největší mýtus:} \textit{Vázané proměnné jdou použít jen v dynamickém SQL.} \textbf{Omyl!} Klasické statické SQL (obyčejný \texttt{SELECT INTO}, \texttt{UPDATE}) používá vázané proměnné automaticky na pozadí a je 100\% bezpečné!
+
+\begin{itemize}
+    \item \textbf{Kdy použít Statické SQL (Zápis napřímo):} Vždy, když předem znáš jména tabulek a sloupců.
+    \item \textbf{Kdy použít Dynamické SQL (\texttt{EXECUTE IMMEDIATE}):} POUZE tehdy, když jméno tabulky/sloupce dostáváš zvenčí (jako text), nebo když tvoříš tabulky (DDL příkazy \texttt{CREATE}/\texttt{DROP} nejdou v PL/SQL napsat normálně).
+\end{itemize}
+
+\subsection*{Pravidla pro Vázané proměnné (\texttt{USING}):}
+\begin{itemize}
+    \item \textbf{Pouze pro DML:} Fungují jen pro \textit{hodnoty} (čísla, jména v klauzuli \texttt{WHERE}).
+    \item \textbf{Zákaz v DDL:} U názvů tabulek, sloupců a DDL příkazů se musí řetězce lepit natvrdo přes \texttt{||}.
+    \item \textbf{Chyba ORA-01745:} Název vázané proměnné nesmí být klíčové slovo SQL. Nelze napsat \texttt{:table}, použij \texttt{:t\_name}.
+\end{itemize}
+
+\section{Výjimky (Exceptions) a Vlastní chyby}
+\begin{itemize}
+    \item \textbf{Tichý zabiják \texttt{WHEN OTHERS}:} Samotný \texttt{ROLLBACK} v tomto bloku chybu sežere. Vždy přidej: \texttt{dbms\_output.put\_line(SQLERRM);} (vypíše přesný důvod selhání).
+    \item \textbf{\texttt{COUNT()} nikdy nespadne:} Funkce \texttt{COUNT(*)} neháže výjimku \texttt{NO\_DATA\_FOUND}. Pokud nenajde data, poslušně vrátí \texttt{0}.
+\end{itemize}
+
+\subsection*{Jak vytvořit a zachytit VLASTNÍ výjimku:}
+\begin{enumerate}
+    \item \textbf{Deklarace:} \texttt{moje\_chyba EXCEPTION;}
+    \item \textbf{Vyvolání (Když se něco pokazí):} \texttt{RAISE moje\_chyba;}
+    \item \textbf{Zachycení (Na konci bloku):} \texttt{WHEN moje\_chyba THEN ...}
+\end{enumerate}
+\textit{(Alternativou je \texttt{raise\_application\_error(-20000, 'Text');} - přijímá pouze čísla od -20000 do -20999 a ukončí kód sama).}
+
+\newpage
+\section{Přesná Syntaxe PL/SQL Objektů}
+
+\subsection{PROCEDURE (Procedura)}
+Nedokáže vrátit hodnotu přímo do proměnné. Provádí akce (INSERT, UPDATE atd.). Nepíše se slovo \texttt{DECLARE}. K deklaraci proměnných slouží prostor mezi \texttt{IS} a \texttt{BEGIN}.
+\begin{lstlisting}
+CREATE OR REPLACE PROCEDURE jmeno_procedury (p_parametr1 INT, p_parametr2 VARCHAR2) 
+IS
+    -- Zde se deklaruji promenne (zadne slovo DECLARE)
+    v_cislo INT := 0;
+BEGIN
+    -- Telo procedury
+    UPDATE tabulka SET sloupec = v_cislo WHERE id = p_parametr1;
+EXCEPTION
+    WHEN OTHERS THEN
+        ROLLBACK;
+        dbms_output.put_line(SQLERRM);
+END jmeno_procedury;
+\end{lstlisting}
+
+\subsection{FUNCTION (Funkce)}
+Vždy musí vrátit nějakou hodnotu (přes příkaz \texttt{RETURN}).
+\begin{lstlisting}
+CREATE OR REPLACE FUNCTION jmeno_funkce (p_parametr INT) 
+    RETURN VARCHAR2 -- Musi deklarovat navratovy typ!
+IS
+    v_vysledek VARCHAR2(100);
+BEGIN
+    SELECT nazev INTO v_vysledek FROM tabulka WHERE id = p_parametr;
+    RETURN v_vysledek; -- Musi vratit hodnotu!
+EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+        RETURN 'Nenalezeno'; -- Zachranny return i ve vyjimce!
+END jmeno_funkce;
+\end{lstlisting}
+
+\subsection{TRIGGER (Spoušť)}
+Spouští se automaticky při manipulaci s daty. Neumí přijímat parametry.
+\begin{itemize}
+    \item \texttt{BEFORE / AFTER}: Kdy se má spustit.
+    \item \texttt{FOR EACH ROW}: Znamená, že trigger proběhne pro \textit{každý jeden ovlivněný řádek}.
+    \item \texttt{:NEW} a \texttt{:OLD}: Přístup k datům v řádku. U příkazu \texttt{INSERT} existuje jen \texttt{:NEW}, u \texttt{DELETE} jen \texttt{:OLD}, u \texttt{UPDATE} oba. Sloupce se musí vypsat tečkovou notací (\texttt{:OLD.jmeno}).
+\end{itemize}
+\begin{lstlisting}
+CREATE OR REPLACE TRIGGER jmeno_triggeru
+    BEFORE UPDATE ON jmeno_tabulky
+    FOR EACH ROW -- Vykona se pro kazdy modifikovany radek
+BEGIN
+    -- Do tabulky LOG_TAB zapisujeme starou a novou hodnotu
+    INSERT INTO log_tab (stara_hodnota, nova_hodnota)
+    VALUES (:OLD.sloupec, :NEW.sloupec);
+END;
+\end{lstlisting}
+
+\subsection{IMPLICITNÍ KURZOR (Smyčka FOR)}
+Nejčistší způsob procházení záznamů. Žádné \texttt{DECLARE}, \texttt{OPEN}, \texttt{FETCH} ani \texttt{CLOSE}.
+\begin{lstlisting}
+BEGIN
+    -- "zaznam" se vytvori sam, neomylne projde vsechny radky a na konci se zavre
+    FOR zaznam IN (
+        SELECT id, nazev 
+        FROM jmeno_tabulky 
+        WHERE status = 'AKTIVNI'
+    ) LOOP
+        -- Pristup k datum POUZE pres teckovou notaci:
+        dbms_output.put_line('ID je: ' || zaznam.id || ', Nazev je: ' || zaznam.nazev);
+    END LOOP;
+END;
+\end{lstlisting}
+
+\end{document}
