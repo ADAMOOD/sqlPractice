@@ -451,7 +451,56 @@ ALTER TABLE WORK_Z_ARTICLE_AUTHOR ADD CONSTRAINT z_pk_aid PRIMARY KEY(aid);
 CREATE OR REPLACE TRIGGER newTrigger
     AFTER INSERT OR UPDATE OR DELETE
     OF z_
-      
+
+
+-- procedura pro parametr rid vytvori tabulku record_rok pro kazdy rok ve kterem autor publikoval clanek
+--v rekordu je id istituce clanku, celkovy pocet clanku v tom roce te instituce, kolik clanku napsal dany autor pro tu institci ten rok
+
+CREATE OR REPLACE PROCEDURE P_authorYearRecord(p_rid INT)
+      IS
+          v_idInstitution INT :=0;
+          v_articlesCountInstitution INT :=0;
+          v_articleCountAuthor INT :=0;
+          v_sql VARCHAR2(2000);
+          v_countTables INT :=0;
+      BEGIN
+        FOR authorsActiveYears IN (SELECT DISTINCT a.year FROM Z_ARTICLE a LEFT JOIN
+                                    z_ARTICLE_AUTHOR aa ON(aa.aid=a.aid)
+                                    WHERE aa.rid = p_rid
+        )LOOP
+            SELECT COUNT(*) INTO v_countTables FROM USER_TABLES WHERE TABLE_NAME = UPPER('record_'||authorsActiveYears.year);
+            IF v_countTables > 0 THEN
+                v_sql := 'DROP TABLE RECORD_'||UPPER(authorsActiveYears.year);
+                EXECUTE IMMEDIATE v_sql;
+                dbms_output.put_line('TABULKA '||UPPER('record_'||authorsActiveYears.year)||' JIZ EXSTOVALA');
+            END IF;
+            v_sql :='CREATE TABLE RECORD_'||authorsActiveYears.year ||' (
+                    iid INT PRIMARY KEY NOT NULL,
+                    article_count INT default 0,
+                    authors_articles_count INT default 0)';
+                    EXECUTE IMMEDIATE v_sql;
+                    dbms_output.put_line('TABULKA '||UPPER('record_'||authorsActiveYears.year)||' VYTVORENA');
+                    
+            v_sql := 'INSERT INTO RECORD_' || authorsActiveYears.year || ' (iid, article_count, authors_articles_count)
+                      SELECT
+                          ai.iid,
+                          (SELECT COUNT(DISTINCT a2.aid)
+                           FROM z_article a2 
+                           JOIN z_article_institution ai2 ON (ai2.aid = a2.aid)
+                           WHERE ai2.iid = ai.iid AND a2.year = :rok ),
+                          COUNT(DISTINCT a.aid)
+                      FROM z_article a
+                      JOIN z_article_institution ai ON a.aid = ai.aid
+                      JOIN z_article_author aa ON a.aid = aa.aid
+                      WHERE aa.rid = :autor 
+                        AND a.year = :rok2
+                      GROUP BY ai.iid';
+            
+            EXECUTE IMMEDIATE v_sql USING authorsActiveYears.year, p_rid, authorsActiveYears.year;
+                
+        END LOOP;
+      END P_authorYearRecord;
+
       
       
       
