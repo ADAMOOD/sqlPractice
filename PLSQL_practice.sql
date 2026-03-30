@@ -511,6 +511,166 @@ BEGIN
                                             dbms_output.put_line(table_name_including_p_name.TABLE_NAME);
                                             DROP TABLE table_name_including_p_name.TABLE_NAME;
                                             END LOOP;
+
+
+
+
+--procedura na vstupu iid vztvori reporty report<year>
+--report bude obsahovat informace o jednotlivych autorechkde u kazdeho autora bude: kolik clanku v danem roce napsal
+--a v kolika unikatnich casopisech v danem roce publikoval 
+--bude vypisovat postupne jmena reportu
+--pokud tabulka jiz existuje tak se nejprve smaze
+--pokud v danem roce nic nepublikoval nevytvari tabulku
+CREATE OR REPLACE PROCEDURE InstitutionReport(p_iid int) IS
+v_sql VARCHAR2(2000);
+v_tableCount int := 0;
+BEGIN
+    FOR institutionYear IN (SELECT DISTINCT a.year
+                            FROM z_Article_institution ai JOIN z_Article a ON(a.aid = ai.aid)
+                            WHERE ai.iid = p_iid
+                            ORDER BY a.year
+                            )LOOP
+                                SELECT COUNT(*) INTO v_tableCount --zjistim pocet tabulek tohoto roku
+                                FROM USER_TABLES 
+                                WHERE TABLE_NAME = UPPER('REPORT'||institutionYear.year);
+                                
+                                IF v_tableCount != 0 THEN --tabulka jiz existovala
+                                    v_sql := 'DROP TABLE REPORT'|| institutionYear.year;
+                                    EXECUTE IMMEDIATE v_sql;
+                                END IF;
+                                v_sql := 'CREATE TABLE REPORT'|| institutionYear.year||' AS 
+                                            SELECT  ar.year AS rok,
+                                            aa.rid AS idAutora,
+                                            au.name AS jmenoAutora,
+                                            COUNT(DISTINCT ar.aid) AS pocetClanku,
+                                            COUNT(DISTINCT ar.jid) AS pocetCasopisu
+                                            FROM Z_AUTHOR au JOIN z_ARTICLE_AUTHOR aa ON (au.rid = aa.rid)
+                                                            JOIN z_ARTICLE ar ON(ar.aid = aa.aid) AND ar.year = '||institutionYear.year||'
+                                                            JOIN z_article_institution ai ON (ai.aid = ar.aid) 
+                                                            AND ai.iid = '||p_iid||'
+                                            GROUP BY ar.year,aa.rid ,au.name';
+                                EXECUTE IMMEDIATE v_sql;
+                                dbms_output.put_line('REPORT'||institutionYear.year);
+                            END LOOP;
+END;
+     
+BEGIN
+InstitutionReport(75);
+END;
+
+BEGIN
+p_DropTablesLikeName('REPORT%');
+END;
+SELECT * FROM USER_TABLES WHERE TABLE_NAME LIKE 'REPORT%'
+
+PURGE RECYCLEBIN;
+     
+     
+
+CREATE TABLE INSTITUTION_COUNT AS (     
+SELECT i.iid, COUNT(jou.jid) AS article_count, SYSTIMESTAMP AS sptamp --tu musi byt jou at se pocitaji jen ceske a slovenske
+            FROM Z_INSTITUTION i LEFT JOIN Z_ARTICLE_INSTITUTION ai ON(i.iid = ai.iid)
+            LEFT JOIN Z_ARTICLE ar ON (ar.aid = ai.aid)
+            LEFT JOIN z_JOURNAL jou ON (jou.jid = ar.jid AND jou.czech_or_slovak = 'NE')
+           --pokazde co WHERE filtruješ na konkrétní hodnotu sloupec z tabulky, kterou jsi připojil přes LEFT JOIN 
+           --tak se left joiny znici
+            GROUP BY i.iid);
+            
+            
+            SELECT COUNT(jou.jid) as pocet
+            FROM Z_INSTITUTION i LEFT JOIN Z_ARTICLE_INSTITUTION ai ON(i.iid = ai.iid)
+            LEFT JOIN Z_ARTICLE ar ON (ar.aid = ai.aid)
+            LEFT JOIN z_JOURNAL jou ON (jou.jid = ar.jid AND jou.czech_or_slovak = 'NE')
+            WHERE i.iid = 1
+     
+CREATE OR REPLACE TRIGGER t_institution_count
+BEFORE INSERT OR UPDATE
+ON INSTITUTION_COUNT
+FOR EACH ROW
+DECLARE
+v_count INT := 0;
+BEGIN
+    SELECT COUNT(jou.jid) as pocet INTO v_count
+            FROM Z_INSTITUTION i 
+            LEFT JOIN Z_ARTICLE_INSTITUTION ai ON(i.iid = ai.iid)
+            LEFT JOIN Z_ARTICLE ar ON (ar.aid = ai.aid)
+            LEFT JOIN z_JOURNAL jou ON (jou.jid = ar.jid AND jou.czech_or_slovak = 'NE')
+            WHERE i.iid = :NEW.iid; --tady muze byt where jelikoz je to ta uplne nejvice leva tabulka
+    IF v_count = 0 THEN 
+        raise_application_error(-20001,'No article for institution');
+        --konec
+    ELSE --podle me tady musi byt to else jelikoz si nejsem jisty zda ta vyjimka zastavi chod anebo jen vyhodi chybu a kod pokracuje dale dalsim radkem
+        :NEW.article_count := v_count;
+        :NEW.sptamp := SYSTIMESTAMP;
+    END IF;
+END;
+    
+     
+INSERT INTO INSTITUTION_COUNT VALUES (1,1000,SYSTIMESTAMP);
+
+
+--vytvori agregovanou tabulku s rid, jmenem a celkovy pocet unikatnich clanku
+--do tabulky se zapisou pouze ti autori jejihz pocet je vetsi nez p_min_articles
+CREATE OR REPLACE PROCEDURE P_BuildAuthorRankingStats(p_min_articles INT, p_mode VARCHAR2)
+IS
+    v_sql VARCHAR2(2000);
+    v_tableExists int :=0;
+    e_table_exists EXCEPTION;
+BEGIN
+    IF p_min_articles < 0 THEN
+        dbms_output.put_line('p_min_articles nesmi byt zaporne!');
+        RETURN;
+    ELSIF p_mode IS NULL  OR
+          p_mode NOT IN('REPLACE','CREATE') THEN
+        dbms_output.put_line('p_mode nevalidni!');
+        RETURN;
+    END IF;
+    
+    SELECT COUNT(*) INTO v_tableexists FROM USER_TABLES WHERE TABLE_NAME = 'AUTHOR_RANKING_STATS';
+    
+    IF p_mode = 'CREATE' THEN
+        IF v_tableexists != 0 THEN
+            RAISE e_table_exists;
+        END IF;
+    ELSIF p_mode = 'REPLACE' THEN
+        IF v_tableexists > 0 THEN
+            v_sql := 'DROP TABLE AUTHOR_RANKING_STATS';
+            EXECUTE IMMEDIATE v_sql;
+        END IF;
+    END IF;
+    v_sql := 'CREATE TABLE AUTHOR_RANKING_STATS AS 
+    
+                SELECT au.rid, au.name, COUNT(DISTINCT aa.aid) AS total_articles
+                FROM Z_AUTHOR au LEFT JOIN Z_ARTICLE_AUTHOR aa ON (aa.rid = au.rid)
+                GROUP BY au.rid, au.name
+                HAVING COUNT(DISTINCT aa.aid) > '||p_min_articles; -- tady si nejsem jisty zda muze byt bind variable asi ne
+                -- proc tady nemuze byt total_articles >?? to jeste nezna??? ja myslel ze having se spousti po celem dotazu posledni
+                EXECUTE IMMEDIATE v_sql;
+    EXCEPTION
+        WHEN e_table_exists THEN
+            raise_application_error(-20010,'Tabulka jiz existuje a parametr je CREATE');
+END;
+
+                SELECT au.rid, au.name, COUNT(DISTINCT aa.aid) AS total_articles
+                FROM Z_AUTHOR au LEFT JOIN Z_ARTICLE_AUTHOR aa ON (aa.rid = au.rid)
+                GROUP BY au.rid, au.name
+                HAVING COUNT(DISTINCT aa.aid) >5
+
+
+SELECT COUNT(*) FROM USER_TABLES WHERE TABLE_NAME = 'AUTHOR_RANKING_STATS';
+
+BEGIN 
+    P_BuildAuthorRankingStats(5,'CREATE');
+END;
+
+SELECT * FROM AUTHOR_RANKING_STATS
+
+
+
+
+
+
+
                                         
 END;  
       
