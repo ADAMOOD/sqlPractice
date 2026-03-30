@@ -501,8 +501,18 @@ CREATE OR REPLACE PROCEDURE P_authorYearRecord(p_rid INT)
         END LOOP;
       END P_authorYearRecord;
 
-      
-      
+CREATE OR REPLACE PROCEDURE p_DropTablesLikeName(p_name VARCHAR2)
+IS
+    v_sql VARCHAR2(2000);
+BEGIN
+        FOR table_name_including_p_name IN (SELECT TABLE_NAME 
+                                            FROM USER_TABLES
+                                            WHERE TABLE_NAME LIKE UPPER(p_name))LOOP
+                                            dbms_output.put_line(table_name_including_p_name.TABLE_NAME);
+                                            DROP TABLE table_name_including_p_name.TABLE_NAME;
+                                            END LOOP;
+                                        
+END;  
       
 
 
